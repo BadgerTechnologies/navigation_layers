@@ -7,7 +7,6 @@
 //
 #ifndef SOCIAL_NAVIGATION_LAYERS_BADGER_HUMAN_LAYER_H
 #define SOCIAL_NAVIGATION_LAYERS_BADGER_HUMAN_LAYER_H
-#include <cmath>
 #include <ros/ros.h>
 #include <dynamic_reconfigure/server.h>
 #include <pluginlib/class_list_macros.h>
@@ -32,8 +31,8 @@ public:
                            int min_i, int min_j, int max_i, int max_j);
 
 protected:
-  inline static const double LETHAL_COST = static_cast<double>(costmap_2d::LETHAL_OBSTACLE);
-  inline static const double INSCRIBED_COST = static_cast<double>(costmap_2d::INSCRIBED_INFLATED_OBSTACLE);
+  static constexpr double LETHAL_COST = static_cast<double>(costmap_2d::LETHAL_OBSTACLE);
+  static constexpr double INSCRIBED_COST = static_cast<double>(costmap_2d::INSCRIBED_INFLATED_OBSTACLE);
   void configure(HumanLayerConfig& config, uint32_t level);
   double cutoff_, lethal_radius_, inscribed_radius_, variance_;
   double calculate_cost(double x, double y, double x0, double y0, double variance,
