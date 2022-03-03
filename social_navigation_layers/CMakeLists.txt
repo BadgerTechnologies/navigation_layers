@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.0.2)
 project(social_navigation_layers)
 set_directory_properties(PROPERTIES COMPILE_OPTIONS "-Wall;-Werror")
+set(CMAKE_CXX_STANDARD 17)
 
 find_package(catkin REQUIRED COMPONENTS
   angles

@@ -21,9 +21,6 @@ void HumanLayer::onInitialize()
   server_ = new dynamic_reconfigure::Server<HumanLayerConfig>(nh);
   f_ = boost::bind(&HumanLayer::configure, this, _1, _2);
   server_->setCallback(f_);
-
-  lethal_cost_ = (double) costmap_2d::LETHAL_OBSTACLE;
-  inscribed_cost_ = (double) costmap_2d::INSCRIBED_INFLATED_OBSTACLE;
 }
 
 // Calculates the obstacle cost of a point in 2D space
@@ -48,17 +45,17 @@ double HumanLayer::calculate_cost(double x, double y, double x0, double y0, doub
                                   double lethal_radius, double inscribed_radius)
 {
   double cost;
-  double dx = x - x0;
-  double dy = y - y0;
-  double radius = sqrt(dx * dx + dy * dy);
+  const double dx = x - x0;
+  const double dy = y - y0;
+  const double radius = std::sqrt(dx * dx + dy * dy);
   if (radius < lethal_radius)
-    cost = lethal_cost_;
+    cost = LETHAL_COST;
   else if (radius < inscribed_radius)
-    cost = inscribed_cost_;
+    cost = INSCRIBED_COST;
   else {
-    cost = inscribed_cost_ * exp(-(radius - inscribed_radius) / variance);
-    if (cost > inscribed_cost_)
-      cost = inscribed_cost_;
+    cost = INSCRIBED_COST * std::exp(-(radius - inscribed_radius) / variance);
+    if (cost > INSCRIBED_COST)
+      cost = INSCRIBED_COST;
   }
 
   return cost;
@@ -80,7 +77,7 @@ double HumanLayer::calculate_cost(double x, double y, double x0, double y0, doub
 //  maximum radius of changes to costmap surrounding a human in meters
 double HumanLayer::get_radius(double inscribed_radius, double cutoff, double variance)
 {
-  return inscribed_radius - variance * log(cutoff / inscribed_cost_);
+  return inscribed_radius - variance * std::log(cutoff / INSCRIBED_COST);
 }
 
 // Calculates the min/max bounding box of costmap changes for all people
@@ -95,11 +92,11 @@ double HumanLayer::get_radius(double inscribed_radius, double cutoff, double var
 //  (min_x, min_y, max_x, max_y) - Pointers to bounding box of changes
 void HumanLayer::updateBoundsFromPeople(double* min_x, double* min_y, double* max_x, double* max_y)
 {
-  double point = get_radius(inscribed_radius_, cutoff_, variance_);
+  const double point = get_radius(inscribed_radius_, cutoff_, variance_);
   std::list<people_msgs::Person>::iterator p_it;
   for (p_it = transformed_people_.begin(); p_it != transformed_people_.end(); ++p_it)
   {
-    people_msgs::Person person = *p_it;
+    const people_msgs::Person& person = *p_it;
 
     *min_x = std::min(*min_x, person.position.x - point);
     *min_y = std::min(*min_y, person.position.y - point);
@@ -120,33 +117,33 @@ void HumanLayer::updateBoundsFromPeople(double* min_x, double* min_y, double* ma
 void HumanLayer::updateCosts(costmap_2d::Costmap2D& master_grid,
                              int min_i, int min_j, int max_i, int max_j)
 {
+  boost::recursive_mutex::scoped_lock lock(lock_);
   if (people_list_.people.size() == 0)
     return;
 
-  boost::recursive_mutex::scoped_lock lock(lock_);
   if (!enabled_)
     return;
 
   std::list<people_msgs::Person>::iterator p_it;
   costmap_2d::Costmap2D* costmap = layered_costmap_->getCostmap();
-  double res = costmap->getResolution();
-  double base = get_radius(inscribed_radius_, cutoff_, variance_);
+  const double res = costmap->getResolution();
+  const double base = get_radius(inscribed_radius_, cutoff_, variance_);
   // Width of square bounding box for a person in units of costmap cells
-  unsigned int width = std::max(1, static_cast<int>((2.0 * base) / res));
+  const unsigned int width = std::max(1, static_cast<int>((2.0 * base) / res));
 
   for (p_it = transformed_people_.begin(); p_it != transformed_people_.end(); ++p_it)
   {
-    people_msgs::Person person = *p_it;
+    const people_msgs::Person& person = *p_it;
 
     // Global frame coordinates of person (meters)
-    double cx = person.position.x;
-    double cy = person.position.y;
+    const double cx = person.position.x;
+    const double cy = person.position.y;
 
     // Offset coordinates of person (meters). For a typical map, this is
     // the lower-left corner of the bounding box for the costmap cells
     // we are going to modify.
-    double ox = cx - base;
-    double oy = cy - base;
+    const double ox = cx - base;
+    const double oy = cy - base;
 
     // Convert offset coords to discretized coordinates in units of
     // costmap cells
@@ -178,8 +175,8 @@ void HumanLayer::updateCosts(costmap_2d::Costmap2D& master_grid,
     // Shift bounding box start by half of a costmap cell to represent
     // the center of the cell, instead of the lower-left corner, to
     // calculate the cost. (bx, by) are in units of meters.
-    double bx = ox + res / 2;
-    double by = oy + res / 2;
+    const double bx = ox + res / 2;
+    const double by = oy + res / 2;
     // Calculate the cost of each cell in the bounding box around person
     for (int i = start_x; i < end_x; i++)
     {
@@ -199,7 +196,7 @@ void HumanLayer::updateCosts(costmap_2d::Costmap2D& master_grid,
           // Don't bother updating the costmap for costs that are small
           continue;
 
-        unsigned char cvalue = (unsigned char) a;
+        unsigned char cvalue = static_cast<unsigned char>(a);
         costmap->setCost(i + dx, j + dy, std::max(cvalue, old_cost));
       }
     }
@@ -215,7 +212,6 @@ void HumanLayer::configure(HumanLayerConfig& config, uint32_t level)
   variance_ = config.variance;
   lethal_radius_ = config.lethal_radius;
   inscribed_radius_ = config.inscribed_radius;
-  people_keep_time_ = ros::Duration(config.keep_time);
 }
 
 };  // namespace social_navigation_layers
